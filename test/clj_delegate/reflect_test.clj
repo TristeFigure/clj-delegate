@@ -1,8 +1,7 @@
-(ns delegate.reflect-bis-test
+(ns clj-delegate.reflect-test
   (:refer-clojure :exclude [methods])
   (:require [clojure.test :refer :all]
-            [delegate.reflect-bis :refer :all
-             :reload true]))
+            [clj-delegate.reflect :refer :all]))
 
 (defrecord R [a])
 
@@ -47,7 +46,8 @@
   (metxxx [this] :no))
 
 (deftest test-protocols
-  (are [x] (= (-> x protocols first :on)
-              'delegate.reflect_bis_test.Prot)
-       Rec
-       'Rec))
+  (binding [*ns* (find-ns 'clj-delegate.reflect-test)]
+    (are [x] (= (-> x protocols first :on)
+                'clj_delegate.reflect_test.Prot)
+         Rec
+         'Rec)))

@@ -1,10 +1,10 @@
-(ns delegate.type-bis
+(ns clj-delegate.machinery
   (:use [clojure.pprint])
-  (:require [delegate.reflect-bis :refer [get-basis is-record? protocol?
-                                          all-methods parameter-names
-                                          record-native-interfaces]
+  (:require [clj-delegate.reflect
+             :refer [get-basis is-record? protocol?
+                     all-methods parameter-names]
              :as reflect]
-            [shuriken.core :refer [deep-merge fully-qualify index-by]]))
+            [shuriken.core :refer [deep-merge fully-qualify index-by slice]]))
 
 ;                   local format   list of clojure.lang.Method   deftype specs
 ; to-deftype-specs        • -----------------------------------------> •
@@ -24,6 +24,11 @@
         (.delegate ~'this)
         ~@params)))
 
+(defn partition-deftype-specs [specs]
+  (slice symbol? specs
+         :include-delimiter :left
+         :include-empty true))
+
 (defn- to-local-format [delegate specs]
   (if (-> specs meta :format (= :local-format))
     specs
@@ -33,7 +38,7 @@
           [(:name x)
            (-> x :params rest parameter-names)])
         #(last %2)
-        (if (instance? clojure.reflect.Method (-> specs first))
+        (if (instance? clojure.reflect.Method (first specs))
           ;; convert from list of clojure.reflect.Methods to local format
           (->> specs
                (map (fn [{:keys [name declaring-class protocol parameter-types] :as m}]
@@ -46,13 +51,16 @@
                          :body (delegate-body name params)}))))
           ;; convert defrecord/deftype quoted specs code to local format
           (->> specs
-               (partition-by class)
-               (partition 2)
-               (mapcat (fn [[[proto-or-class] methods]]
-                         (for [m (map parse-method-code methods)]
-                           (assoc m
-                             :declaring-class delegate
-                             :protocol (fully-qualify proto-or-class))))))))
+               partition-deftype-specs
+               (mapcat (fn [[proto-or-class & methods]]
+                         (if (empty? methods)
+                           [{:declaring-class delegate
+                             :protocol (fully-qualify proto-or-class)
+                             :no-method true}]
+                           (for [m (map parse-method-code methods)]
+                             (assoc m
+                               :declaring-class delegate
+                               :protocol (fully-qualify proto-or-class)))))))))
       {:format :local-format})))
 
 (defn- to-deftype-specs [delegate formatted-specs]
@@ -64,10 +72,12 @@
                vals
                (group-by :protocol)
                (mapcat (fn [[proto methods]]
-                         `(~proto
-                            ~@(for [{:keys [name params this body]} methods]
-                                `(~name ~(vec (cons this params))
-                                   ~@body))))))
+                         (if (-> methods first :no-method)
+                           (list proto)
+                           `(~proto
+                              ~@(for [{:keys [name params this body]} methods]
+                                  `(~name ~(vec (cons this params))
+                                          ~@body)))))))
           {:format :deftype-specs}))))
 
 (defn- merge-specs [delegate & args]
@@ -77,7 +87,10 @@
 
 (def emit-deftype* @#'clojure.core/emit-deftype*)
 
-(defn protocol-symbol-to-class-symbol [sym]
+(defn protocol-symbol-to-class-symbol
+  "Converts from a fully qualified symbol denoting a protocol's ivar
+  to a fully qualified symbol denoting the corresponding class."
+  [sym]
   (let [string (str sym)
         adapt #(-> %
                    (clojure.string/replace "/" ".")
@@ -87,27 +100,36 @@
         (adapt string)
         (-> string symbol fully-qualify str adapt)))))
 
+(defn ensure-namespaced-symbol
+  "If the given symbol has no namespace, prepend it with *ns*."
+  [sym]
+  (let [string (str sym)]
+    (symbol
+      (if (re-find #"/|\." string)
+        string
+        (str *ns* \/ string)))))
+
 (defn- emit-deftype [name delegate fields generated-specs]
   (let [local (to-local-format delegate generated-specs)
         protocols (->> local
                        (map (comp :protocol val))
                        distinct
+                       (map ensure-namespaced-symbol)
                        (map protocol-symbol-to-class-symbol)
                       (remove '#{java.lang.Object})
                        vec)
-        methods (map (fn [[k v]]
-                       `(~(:name v) ~(->> v :params (cons 'this) vec)
-                           ~@(:body v)))
-                     local)
+        methods (->> local
+                     (remove (fn [[[_method-name _params] method-specs]]
+                               (:no-method method-specs)))
+                     (map (fn [[k v]]
+                            `(~(:name v) ~(->> v :params (cons 'this) vec)
+                                ~@(:body v)))))
         gname name
         fields (->> fields (cons 'delegate) vec)]
     (emit-deftype* name gname
                    fields protocols
                    methods
-                   {}))
-  ; `(deftype ~name ~(vec (cons 'delegate fields))
-  ;    ~@generated-specs)
-  )
+                   {})))
 
 (defn- emit-delegate-fields-accessors [delegate]
   (let [fields (-> delegate resolve get-basis)]
@@ -160,30 +182,10 @@
   (symbol (-> (str *ns* "."  name)
               (clojure.string/replace "-" "_"))))
 
-(def record-native-methods
-  (->> record-native-interfaces
-       (mapcat reflect/methods)
-       (filter #(instance? clojure.reflect.Method %))
-       (index-by (fn [x]
-                   [(:name x)
-                    (-> x :parameter-types parameter-names)])
-                 #(last %2))))
-
 (def default-transforms
-  {#(= (:protocol %) 'java.lang.Object)              (constantly nil)
-   #(= (:protocol %) 'clojure.lang.IFn)              (constantly nil)
-   #(= (:protocol %) 'java.util.concurrent.Callable) (constantly nil)
-   #(= (:protocol %) 'java.lang.Runnable)            (constantly nil)
-   #(= (:protocol %) 'clojure.lang.AFn)              (constantly nil)
-   
-   #(contains? record-native-methods
-               [(:name %) (:params %)])
-   (fn [v]
-     (let [signature [(:name v)
-                      (-> v :params)]]
-       (assoc v :protocol
-            (:protocol (get record-native-methods
-                            signature)))))})
+  {#(and (= (:protocol %) 'java.lang.Object)
+         (not= (:name %) 'toString))
+   (constantly nil)})
 
 (defn apply-transforms [delegate transforms methods]
   (let [trs (merge default-transforms transforms)]
@@ -206,7 +208,7 @@
                       (emit-delegate-fields-accessors delegate)
                       delegator-specs)))
 
-(defn- emit-deftype-delegate
+(defn emit-deftype-delegate
   [name delegate fields transforms delegator-specs]
   `(do ~(emit-declare-factories name :map-factory? false)
        ~(emit-delegate-fields-protocol delegate)
@@ -220,28 +222,62 @@
        ~(emit-positional-factory name fields)
        ~(emit-return-statement name)))
 
-(defn- emit-defrecord-delegate
-  [name delegate fields transforms delegator-specs]
-  `(do ~(emit-declare-factories name :map-factory? true) ;; •
-       ~(emit-delegate-fields-protocol delegate)
-       ~(emit-declaration name delegate fields
-                          transforms
-                          (merge-specs delegate              
-                                       (apply-transforms delegate transforms
-                                                         (all-methods delegate))
-                                       (cons 'clojure.lang.IRecord
-                                             delegator-specs)))     
-       ; ~(emit-import-statement name)
-       ~(emit-positional-factory name fields)
-       ~(emit-map-factory name)                          ;; +
-       ~(emit-return-statement name)))
+(defn record-transforms [fields]
+  ;; associative functions
+  {#(contains? '#{java.util.Map
+                  clojure.lang.IHashEq
+                  clojure.lang.ILookup
+                  clojure.lang.IKeywordLookup
+                  clojure.lang.IPersistentMap
+                  java.io.Serializable}
+               (:protocol %))
+   (fn [m]
+     (assoc m :body
+       `((~(symbol (str \. (:name m)))
+            (merge (.delegate ~'this)
+                   ~'this)
+            ~@(:params m)))))
+   
+   ;; seq
+   #(contains? '#{clojure.lang.Seqable}
+               (:protocol %))
+   (fn [m]
+     (assoc m :body
+       `((~(symbol (str \. (:name m)))
+            (seq (merge
+                   (.delegate ~'this)
+                   (into {} ~(mapv (fn [f]
+                                     `[~(keyword f)
+                                       (~(symbol (str \. f)) ~'this)])
+                                   fields))))))))
+   
+   ;; keyword look-up
+   #(contains? '#{clojure.lang.IKeywordLookup}
+               (:protocol %))
+   (fn [m]
+     (assoc m :body
+       `((reify clojure.lang.ILookupThunk
+           (get [~'_thunk ~'_target]
+                (get (merge (.delegate ~'this)
+                            ~'this)
+                     ~@(:params m)))))))})
 
-(defmacro defdelegate [name delegate fields map-or-symbol & more]
-  (let [[transforms delegator-specs] (if (map? map-or-symbol)
-                                        [map-or-symbol more]
-                                        [{} (cons map-or-symbol more)])]
-    (if (is-record? delegate)
-      (emit-defrecord-delegate
-        name delegate fields transforms delegator-specs)
-      (emit-deftype-delegate
-        name delegate fields transforms delegator-specs))))
+(defn emit-defrecord-delegate
+  [name delegate fields transforms delegator-specs]
+  `(do ~(emit-declare-factories name :map-factory? true)   ;; •
+       ~(emit-delegate-fields-protocol delegate)
+       ~(emit-declaration
+          name delegate (concat fields '[__meta __extmap]) ;; •
+          transforms
+          (cons
+            'clojure.lang.IRecord                          ;; •
+            (merge-specs delegate              
+                         (apply-transforms delegate
+                                           (merge (record-transforms fields)
+                                                  transforms)
+                                           (all-methods delegate))
+                         delegator-specs)))     
+       ~(emit-import-statement name)
+       ~(emit-positional-factory name fields)
+       ~(emit-map-factory name)                            ;; +
+       ~(emit-return-statement name)))

@@ -4,6 +4,17 @@
             [shuriken.core :refer [fully-qualify and? not? or? tree-seq-breadth
                                    index-by]]))
 
+(def native-record-interfaces
+  '#{clojure.lang.IRecord
+     clojure.lang.IHashEq
+     clojure.lang.IObj
+     clojure.lang.ILookup
+     clojure.lang.IKeywordLookup
+     clojure.lang.IPersistentMap
+     clojure.lang.Associative
+     java.util.Map
+     java.io.Serializable})
+
 (defn ensure-class [x]
   (if (class? x)
     x

@@ -1,12 +1,12 @@
 (ns clj-delegate.core
   (:require [clj-delegate.reflect :refer [is-record?]]
-            [clj-delegate.machinery
-             :refer [emit-deftype-delegate emit-defrecord-delegate]]))
+            [clj-delegate.type   :refer [emit-deftype-delegate]]
+            [clj-delegate.record :refer [emit-defrecord-delegate]]))
 
-(defmacro defdelegate [name delegate fields map-or-symbol & more]
-  (let [[transforms delegator-specs] (if (map? map-or-symbol)
-                                        [map-or-symbol more]
-                                        [{} (cons map-or-symbol more)])]
+(defmacro defdelegate [name delegate fields maybe-vec & more]
+  (let [[transforms delegator-specs] (if (vector? maybe-vec)
+                                        [maybe-vec more]
+                                        [[] (cons maybe-vec more)])]
     (if (is-record? delegate)
       (emit-defrecord-delegate
         name delegate fields transforms delegator-specs)

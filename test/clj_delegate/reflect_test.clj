@@ -1,5 +1,4 @@
 (ns clj-delegate.reflect-test
-  (:refer-clojure :exclude [methods])
   (:require [clojure.test :refer :all]
             [clj-delegate.reflect :refer :all]))
 

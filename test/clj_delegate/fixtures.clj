@@ -41,3 +41,6 @@
   (method-a [this a] :original-a)
   (method-a [this a b] :original-aa)
   (method-b [this b] :original-b))
+
+(defrecord ParentRecord [])
+(defrecord ChildRecord [])

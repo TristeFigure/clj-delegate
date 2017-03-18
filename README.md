@@ -5,13 +5,13 @@ Define delegates around types and records.
 ## Usage
 
 ```clojure
-[org.clojars.tristefigure/shuriken "0.7.0"]
+[clj-delegate "0.1.1"]
 ```
 
 
 ```clojure
 (ns my-ns
-  (:require [shuriken.core :refer :all]))
+  (:require [clj-delegate.core :refer [defdelegate]]))
 ```
 
 ## Example
@@ -90,7 +90,8 @@ Define delegates around types and records.
   ;; Except if the method has been redefined in the body of the delegate of
   ;; if it has been subject to a transform
   )
-``
+```
+
 ## Transforms
 
 An additionnal `transforms` argument can be passed to `defdelegate`:

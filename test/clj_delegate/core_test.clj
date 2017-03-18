@@ -1,5 +1,4 @@
 (ns clj-delegate.core-test
-  (:use clojure.pprint)
   (:require [clojure.test :refer :all]
             [clj-delegate.core :refer :all]
             [clj-delegate.fixtures :refer [Protocol ProtocolA ProtocolB
@@ -7,17 +6,6 @@
             [shuriken.core :refer [thrown?]])
   (:import [clj_delegate.fixtures Type Record Interface]))
 
-#_(pprint
-  (macroexpand-1
-    '(defdelegate DelegateType Type [z]
-      Protocol
-      (method [this a] :overriden)
-      
-      ProtocolA
-      (method-a [this a] :overriden-a)
-      
-      ProtocolB
-      (method-c [this c] :value))))
 (defdelegate DelegateType Type [z]
   Protocol
   (method [this a] :overriden)
@@ -205,4 +193,14 @@
           (= m
              (-> (with-meta deleg m)
                  .delegate
-                 meta)))))))
+                 meta))))
+      (testing "with the strict minimum"
+        (is (not (thrown? Throwable
+                          (defdelegate ADelegate1 Record [])))))
+      (testing "with empty transforms"
+        (is (not (thrown? Throwable
+                          (defdelegate ADelegate2 Record [] [])))))
+      (testing "using fully qualified names"
+        (is (not (thrown? Throwable
+                   (defdelegate ADelegate3 clj_delegate.fixtures.Record
+                     []))))))))

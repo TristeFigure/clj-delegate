@@ -115,6 +115,9 @@
               (clojure.string/replace "-" "_"))))
 
 (defn emit-derive-statement [delegator delegate]
-  `(derive-delegate ~delegator ~delegate))
+  `(derive-delegate ~(-> delegator
+                         ensure-namespaced-symbol
+                         protocol-symbol-to-class-symbol)
+                    ~delegate))
 
 

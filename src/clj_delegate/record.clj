@@ -195,13 +195,14 @@
 
 (defn emit-defrecord-delegate
   [delegator-name delegate-name fields transforms delegator-specs]
-  `(do ~(emit-factories-declarations delegator-name :map-factory? true)   ;; •
-       ~(define-delegate-fields-protocol delegate-name)
-       ~(emit-defrecord delegator-name delegate-name fields
-                        transforms
-                        delegator-specs)
-       ~(emit-import-statement delegator-name)
-       ~(emit-positional-factory delegator-name fields)
-       ~(emit-map-factory delegator-name)                                  ;; +
-       ~(emit-derive-statement delegator-name delegate-name)
-       ~(emit-return-statement delegator-name)))
+  (let [delegate-name (unqualify delegate-name)]
+    `(do ~(emit-factories-declarations delegator-name :map-factory? true)   ;; •
+         ~(define-delegate-fields-protocol delegate-name)
+         ~(emit-defrecord delegator-name delegate-name fields
+                          transforms
+                          delegator-specs)
+         ~(emit-import-statement delegator-name)
+         ~(emit-positional-factory delegator-name fields)
+         ~(emit-map-factory delegator-name)                                  ;; +
+         ~(emit-derive-statement delegator-name delegate-name)
+         ~(emit-return-statement delegator-name))))

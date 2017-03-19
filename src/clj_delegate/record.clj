@@ -50,8 +50,18 @@
                                       delegate#
                                       ~@args)))))
 
+(defn- class-namespace [class]
+  (-> (->> class
+           str
+           (re-matches #"class (.*)\.[^.]+$")
+           second)
+      (clojure.string/replace "_" "-")))
+
 (defn- map-factory-name [tag]
-  (symbol (str "map->" tag)))
+  (symbol
+    (if-let [cns (some-> tag resolve class-namespace)]
+      (str cns "/map->" tag)
+      (str "map->" tag))))
 
 (defn- emit-map-operation [method delegator-name delegate-name fields f]
   `(let [f# ~f

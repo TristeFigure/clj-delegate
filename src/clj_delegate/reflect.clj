@@ -30,6 +30,11 @@
     (resolve class-or-symbol)
     class-or-symbol))
 
+(defn maybe-deref [x]
+  (if (var? x)
+    (deref x)
+    x))
+
 (def ^:private alphabet
   '[a b c d e f g h i j k l m n o p q r s t u v w x y z])
 
@@ -61,7 +66,8 @@
   @#'clojure.core/super-chain)
 
 (defn- find-protocol-impl [protocol x]
-  (let [proto-interface (:on-interface protocol)
+  (let [protocol (maybe-deref protocol)
+        proto-interface (:on-interface protocol)
         x (ensure-class (maybe-resolve x))]
     (if (or (instance? proto-interface x)
             (contains? (ancestors x)
@@ -107,8 +113,8 @@
   (contains? (:flags method) :abstract))
 
 (defn base-ancestors
-  "Like ancestors, but in breadth-first order, from low to high in the class
-  hierarchy."
+  "Like ancestors, but in breadth-first order, from low to high in the
+  class hierarchy."
   [class-or-symbol]
   (distinct
     (rest (tree-seq-breadth
@@ -159,5 +165,4 @@
        (mapcat methods)
        (filter (and? #(instance? clojure.reflect.Method %)
                      public-method?
-                     (not? static-method?)
-                     (not? abstract-method?)))))
+                     (not? static-method?)))))

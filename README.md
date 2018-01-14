@@ -5,7 +5,7 @@ Define delegates around types and records.
 ## Usage
 
 ```clojure
-[clj-delegate "0.1.2"]
+[clj-delegate "0.1.3"]
 ```
 
 
@@ -35,12 +35,12 @@ Define delegates around types and records.
 
 (let [record   (MyRecord. 1 2 3)
       delegator (MyDelegate. record 4)]
-  ;; A record delegate is a record like any other record that stores a delegate
-  ;; instance and supplementary fields.
+  ;; A record delegate is a record like any other record that stores
+  ;; a delegate instance and supplementary fields.
   (println delegator)
   ;; => #clj_delegate.core_test.MyDelegate{:a 1, :b 2, :c 3, :d 4}
   
-  ;; The underlying delegate instace stays accessible as the 'delegate' field
+  ;; The underlying delegate instance stays accessible as the `delegate' field
   (println (.delegate delegator))
   ;; => #clj_delegate.explorations.MyRecord{:a 1, :b 2, :c 3}
   
@@ -68,8 +68,8 @@ Define delegates around types and records.
   ;; => 4
   
   ;; Any modification to the delegator (with the exception of its own fields)
-  ;; impacts the underlying delegate. Here is an example using 'assoc'. The same
-  ;; logic follows with dissoc, conj, cons, with-meta, etc...
+  ;; impacts the underlying delegate. Here is an example using 'assoc'.
+  ;; The same logic follows with dissoc, conj, cons, with-meta, etc...
   (println (.delegate (assoc delegator :x :y)))
   ;; => #clj_delegate.explorations.MyRecord{:a 1, :b 2, :c 3, :x :y}
   
@@ -77,18 +77,18 @@ Define delegates around types and records.
   (println (= delegator record))
   ;; => true
   
-  ;; And are derive from it in the default isa? hierarchy
+  ;; And derive from it in the default isa? hierarchy
   (println (isa? MyDelegate MyRecord))
   ;; => true
   
-  ;; By default all method is forwarded to the delegate
+  ;; By default all methods are forwarded to the delegate
   (println (meta (MyDelegate. (with-meta (MyRecord. 1 2 3)
                                          {:a :aa})
                               4)))
   ;; => {:a :aa}
   
-  ;; Except if the method has been redefined in the body of the delegate of
-  ;; if it has been subject to a transform
+  ;; Except if the method has been redefined in the body of the delegate or
+  ;; if it has been subject to a transform.
   )
 ```
 
@@ -110,8 +110,8 @@ A matcher can be :
   `'[clojure.lang.IObj withMeta [m]]`
   Note that only the number of parameters and not their name matters in the
   signature.
-- a function accepting one method-descriptor as argument that should return true
-  when it matches the method at hand.
+- a function accepting one method-descriptor as argument and that returns true
+  to mean the transformer should be applied to this method.
 
 A transformer can either be :
 - a function accepting a method-descriptor as argument that modifies then
@@ -119,13 +119,13 @@ A transformer can either be :
 - quoted clojure code as a replacement for the method's existing implementation.
 - the nil or false value
 
-These matcher/transformer pairs will be used to process the existing methods of
-the delegate in order to adapt them. Whenever a matcher will match a method, the
-corresponding transformer will be run against it.
-If the transformer is  or returns nil/false, then the method will be removed
-from the delegate implementation.
-Not that transformers return clojure quoted code and should return a seq user
-as body of the adapted method.
+These matcher/transformer pairs will be used to process the existing methods
+of the delegate in order to adapt them. Whenever a matcher will match a
+method, the corresponding transformer will be run against it.
+If the transformer is  or returns `nil`/`false`, then the method will be
+removed from the delegate implementation.
+Not that transformers can return a method descriptor clojure quoted code as
+a seq that will be used as the method's new body.
 
 Example:
 

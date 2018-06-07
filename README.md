@@ -94,7 +94,7 @@ Define delegates around types and records.
 
 ## Transforms
 
-An additionnal `transforms` argument can be passed to `defdelegate`:
+Alternatively a `transforms` argument can be passed to `defdelegate`:
 
 ```clojure
 (defdelegate MyDelegate MyRecord [field1 field2]
@@ -108,10 +108,10 @@ A matcher can be :
 - a method signature triplet of the form:
   `[fully-qualified-class-symbol method-name param-names]`
   `'[clojure.lang.IObj withMeta [m]]`
-  Note that only the number of parameters and not their name matters in the
+  Note that only the number of parameters and not their name matter in the
   signature.
-- a function accepting one method-descriptor as argument and that returns true
-  to mean the transformer should be applied to this method.
+- a function accepting one method-descriptor as argument which should return
+  true when the transformer should be applied to this method.
 
 A transformer can either be :
 - a function accepting a method-descriptor as argument that modifies then

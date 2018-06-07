@@ -120,12 +120,11 @@ A transformer can either be :
 - the nil or false value
 
 These matcher/transformer pairs will be used to process the existing methods
-of the delegate in order to adapt them. Whenever a matcher will match a
-method, the corresponding transformer will be run against it.
-If the transformer is  or returns `nil`/`false`, then the method will be
-removed from the delegate implementation.
-Not that transformers can return a method descriptor clojure quoted code as
-a seq that will be used as the method's new body.
+of the delegate in order to adapt them. Whenever a matcher matches a
+method, the corresponding transformer is run against it.
+If the transformer is or returns `nil`/`false` the method is removed from
+the delegate implementation.
+Note that transformers can return a method descriptor or clojure quoted code.
 
 Example:
 
